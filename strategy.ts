@@ -46,7 +46,6 @@ const LADDER_SELL_SLIPPAGE_BPS = 10_000;
 
 // --- Leg B (sniper padding) parameters ------------------------------------
 const SNIPER_STAKE = 20_000_000n; // 0.02 SOL per coin
-const SNIPER_MIN_BUY = 5_000_000n; // 0.005 SOL: smallest buy worth a tx fee
 const SNIPER_MIN_ROUND_TRIP = 10_000_000n; // 0.01 SOL: guardrail minimum per coin
 const SNIPER_MAX_AGE = 3; // slots since create
 const SNIPER_MIN_REAL_SOL = 300_000_000n; // 0.3 SOL
@@ -280,7 +279,6 @@ export function createStrategy(): Strategy {
           const maxBuy = state.maxBuyLamports(c.mint);
           const amount = SNIPER_STAKE < maxBuy ? SNIPER_STAKE : maxBuy;
           if (amount < SNIPER_MIN_ROUND_TRIP) continue;
-          if (amount < SNIPER_MIN_BUY) continue;
           if (free < amount + tx) continue;
           sniperSeq += 1;
           orders.push({ side: 'buy', mint: c.mint, quote_lamports: amount, max_slippage_bps: SNIPER_BUY_SLIPPAGE_BPS, client_id: `SN-${sniperSeq}` });
