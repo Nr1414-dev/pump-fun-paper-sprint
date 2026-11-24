@@ -109,6 +109,10 @@ export function createStrategy(): Strategy {
   function readEvents(batch: Batch): void {
     for (const e of batch.events) {
       if (e.event === 'CreateEvent') {
+        // A mint is created once. If a duplicate CreateEvent ever arrives
+        // (re-delivery), keep the first tape: resetting would wipe
+        // ladderEntered / buyers / devBuy and let the coin be bought twice.
+        if (tape.has(e.mint)) continue;
         tape.set(e.mint, {
           mint: e.mint,
           createSlot: e.slot,
@@ -193,8 +197,20 @@ export function createStrategy(): Strategy {
         if (selling.has(mint)) continue;
         const curve = state.curves.get(mint);
         if (curve === undefined || curve.complete) continue;
-        const h = held.get(mint);
-        const leg = h?.leg ?? 'sniper';
+        let h = held.get(mint);
+        if (h === undefined) {
+          // The buy fill for this position was never seen, so no held record
+          // exists. Rebuild it from the tape instead of guessing the leg:
+          // a ladder position misread as a sniper would be cut at +15% /
+          // -12% after 10 slots (and on a creator sale) instead of riding
+          // to R=50 / R=24 for up to 20,000 slots. The open slot is unknown
+          // once the fill is missed, so the hold is measured from discovery,
+          // as the kit pilot sniper does; txPaid is one tx fee, as there.
+          const c0 = tape.get(mint);
+          h = { leg: c0?.ladderEntered ? 'ladder' : 'sniper', openedSlot: state.slot, txPaid: tx };
+          held.set(mint, h);
+        }
+        const leg = h.leg;
         let exit = false;
         if (leg === 'ladder') {
           const r = curve.real_quote_reserves;
